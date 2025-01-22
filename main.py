@@ -1,6 +1,7 @@
 import ccxt
 import pandas as pd
 import time
+from datetime import datetime, timezone
 
 # Инициализация клиента Bybit
 exchange = ccxt.bybit({
@@ -13,16 +14,23 @@ symbol = 'BTC/USDT'
 timeframe = '1h'  # Можно использовать '1m', '5m', '15m', '1h', '1d' и т.д.
 limit = 200  # Количество свечей за один запрос
 
-# Загрузка исторических данных
+
+def get_start_of_day():
+    now = datetime.now(timezone.utc)  # Текущее время с временной зоной UTC
+    # Полночь текущего дня (UTC)
+    start_of_day = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    return int(start_of_day.timestamp() * 1000)
 
 
 def fetch_historical_data(symbol, timeframe, limit):
-    since = exchange.parse8601('2022-01-01T00:00:00Z')  # Начало данных
+    since = get_start_of_day()  # Загружаем с 2023 года
     all_data = []
 
     while True:
         try:
+            print(f"Загружаем данные с {since}")  # Лог
             ohlcv = exchange.fetch_ohlcv(symbol, timeframe, since, limit)
+            print(f"ohlcv {ohlcv}")  # Лог
             if not ohlcv:
                 break
             all_data.extend(ohlcv)
@@ -32,15 +40,17 @@ def fetch_historical_data(symbol, timeframe, limit):
             print(f"Ошибка: {e}")
             break
 
+    print(f"Загружено {len(all_data)} записей.")
     return pd.DataFrame(all_data, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
 
 # Загрузка данных
 df = fetch_historical_data(symbol, timeframe, limit)
+print(df)
 
-# Обработка данных
+# Преобразование timestamp в читаемый формат
 df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
 df.set_index('timestamp', inplace=True)
 
-# Визуализация данных
-print(df.head())
+# Сохраняем данные в CSV
+df.to_csv('data/today/bybit.csv', index=True)
